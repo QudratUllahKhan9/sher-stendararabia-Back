@@ -4,39 +4,38 @@ const { MongoClient } = require("mongodb");
 
 const app = express();
 
-app.use(cors({
-  origin: "https://sher-stendararabia-front.vercel.app"
-}));
-
 app.use(express.json());
 
-// ======================
-// MONGO (GLOBAL SAFE)
+// 🔥 FIXED CORS (NO PRE-FLIGHT ISSUE)
+app.use(
+  cors({
+    origin: "https://sher-stendararabia-front.vercel.app",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
+  })
+);
+
+app.options("*", cors());
+
 // ======================
 const client = new MongoClient(process.env.MONGO_URI);
 
-let db;
 let collection;
 
 async function connectDB() {
-  if (!db) {
+  if (!collection) {
     await client.connect();
-    db = client.db("standardarabia");
+    const db = client.db("standardarabia");
     collection = db.collection("certificates");
-    console.log("Mongo Connected");
   }
   return collection;
 }
 
 // ======================
-// TEST ROUTE
-// ======================
 app.get("/", (req, res) => {
-  res.send("Backend Working");
+  res.send("API Working");
 });
 
-// ======================
-// GET
 // ======================
 app.get("/certificates", async (req, res) => {
   try {
@@ -44,26 +43,16 @@ app.get("/certificates", async (req, res) => {
     const data = await col.find({}).toArray();
     res.json(data);
   } catch (err) {
-    console.log(err);
     res.status(500).json({ message: err.message });
   }
 });
 
 // ======================
-// POST
-// ======================
 app.post("/certificates", async (req, res) => {
   try {
     const col = await connectDB();
 
-    const {
-      name,
-      iqama,
-      cardNo,
-      expiry,
-      issued,
-      course
-    } = req.body;
+    const { name, iqama, cardNo, expiry, issued, course } = req.body;
 
     if (!name || !iqama || !cardNo || !expiry || !issued || !course) {
       return res.status(400).json({ message: "Missing fields" });
@@ -82,16 +71,16 @@ app.post("/certificates", async (req, res) => {
       expiry,
       issued,
       course,
-      createdAt: new Date()
+      createdAt: new Date(),
     });
 
     res.status(201).json({
       success: true,
-      id: result.insertedId
+      id: result.insertedId,
     });
 
   } catch (err) {
-    console.log("ERROR:", err);
+    console.log(err);
     res.status(500).json({ message: err.message });
   }
 });
