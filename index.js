@@ -11,8 +11,13 @@ app.use(
   cors({
     origin:
       "https://sher-stendararabia-front.vercel.app",
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   })
 );
+
+// IMPORTANT
+app.options("*", cors());
 
 app.use(express.json());
 
@@ -43,7 +48,7 @@ const formatDate = (date) => {
 };
 
 // =========================
-// CONNECT DATABASE
+// START SERVER
 // =========================
 async function startServer() {
 
@@ -66,7 +71,7 @@ async function startServer() {
   });
 
   // =========================
-  // GET CERTIFICATES
+  // GET
   // =========================
   app.get(
     "/certificates",
@@ -82,7 +87,7 @@ async function startServer() {
   );
 
   // =========================
-  // POST CERTIFICATE
+  // POST
   // =========================
   app.post(
     "/certificates",
@@ -113,7 +118,7 @@ async function startServer() {
           });
         }
 
-        // duplicate check
+        // duplicate
         const exist =
           await collection.findOne({
             cardNo,
@@ -163,6 +168,6 @@ async function startServer() {
 startServer();
 
 // =========================
-// EXPORT APP
+// EXPORT
 // =========================
 module.exports = app;
