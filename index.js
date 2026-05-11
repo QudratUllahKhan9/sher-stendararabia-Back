@@ -4,45 +4,32 @@ const { MongoClient } = require("mongodb");
 
 const app = express();
 
-// ======================
-// CORS (IMPORTANT)
-// ======================
-app.use(
-  cors({
-    origin:
-      "https://sher-stendararabia-front.vercel.app",
-    methods: ["GET", "POST", "OPTIONS"],
-    credentials: true,
-  })
-);
-
-app.options("*", cors());
+app.use(cors({
+  origin: "https://sher-stendararabia-front.vercel.app"
+}));
 
 app.use(express.json());
 
 // ======================
-// DB
+// MONGO (GLOBAL SAFE)
 // ======================
-const client = new MongoClient(
-  process.env.MONGO_URI
-);
+const client = new MongoClient(process.env.MONGO_URI);
 
+let db;
 let collection;
 
-// ======================
-// CONNECT DB
-// ======================
 async function connectDB() {
-  if (!collection) {
+  if (!db) {
     await client.connect();
-    const db = client.db("standardarabia");
+    db = client.db("standardarabia");
     collection = db.collection("certificates");
+    console.log("Mongo Connected");
   }
   return collection;
 }
 
 // ======================
-// HOME
+// TEST ROUTE
 // ======================
 app.get("/", (req, res) => {
   res.send("Backend Working");
@@ -52,14 +39,14 @@ app.get("/", (req, res) => {
 // GET
 // ======================
 app.get("/certificates", async (req, res) => {
-  const col = await connectDB();
-
-  const data = await col
-    .find({})
-    .sort({ createdAt: -1 })
-    .toArray();
-
-  res.json(data);
+  try {
+    const col = await connectDB();
+    const data = await col.find({}).toArray();
+    res.json(data);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ======================
@@ -75,28 +62,17 @@ app.post("/certificates", async (req, res) => {
       cardNo,
       expiry,
       issued,
-      course,
+      course
     } = req.body;
 
-    if (
-      !name ||
-      !iqama ||
-      !cardNo ||
-      !expiry ||
-      !issued ||
-      !course
-    ) {
-      return res.status(400).json({
-        message: "All fields required",
-      });
+    if (!name || !iqama || !cardNo || !expiry || !issued || !course) {
+      return res.status(400).json({ message: "Missing fields" });
     }
 
     const exist = await col.findOne({ cardNo });
 
     if (exist) {
-      return res.status(400).json({
-        message: "Card already exists",
-      });
+      return res.status(400).json({ message: "Card already exists" });
     }
 
     const result = await col.insertOne({
@@ -106,22 +82,18 @@ app.post("/certificates", async (req, res) => {
       expiry,
       issued,
       course,
-      createdAt: new Date(),
+      createdAt: new Date()
     });
 
     res.status(201).json({
       success: true,
-      id: result.insertedId,
+      id: result.insertedId
     });
 
   } catch (err) {
-    res.status(500).json({
-      message: err.message,
-    });
+    console.log("ERROR:", err);
+    res.status(500).json({ message: err.message });
   }
 });
 
-// ======================
-// EXPORT
-// ======================
 module.exports = app;
