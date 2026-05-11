@@ -1,17 +1,27 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const { MongoClient } = require("mongodb");
 
 const app = express();
 
-app.use(express.json());
+// ======================
+// DEBUG ENV
+// ======================
+console.log("ENV CHECK:", process.env.MONGO_URI);
 
 // ======================
-// CORS SAFE
+// MIDDLEWARE
 // ======================
+app.use(express.json());
+
 app.use(
   cors({
-    origin: "https://sher-stendararabia-front.vercel.app",
+    origin: [
+      "http://localhost:5173",
+      "https://sher-stendararabia-front.vercel.app",
+    ],
     methods: ["GET", "POST", "OPTIONS"],
   })
 );
@@ -19,36 +29,45 @@ app.use(
 app.options("*", cors());
 
 // ======================
-// MONGO (IMPORTANT FIX)
+// MONGO CLIENT
 // ======================
-const client = new MongoClient(process.env.MONGO_URI, {
-  maxPoolSize: 10,
-});
+const client = new MongoClient(process.env.MONGO_URI);
 
 let db;
 let collection;
 
-// connect once only
+// ======================
+// CONNECT DB (SAFE)
+// ======================
 async function connectDB() {
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI is missing");
+  }
+
   if (!db) {
     await client.connect();
     db = client.db("standardarabia");
     collection = db.collection("certificates");
     console.log("Mongo Connected");
   }
+
   return collection;
 }
 
 // ======================
+// TEST ROUTE
+// ======================
 app.get("/", (req, res) => {
-  res.send("API Working");
+  res.send("API Working 🚀");
 });
 
+// ======================
+// GET ALL
 // ======================
 app.get("/certificates", async (req, res) => {
   try {
     const col = await connectDB();
-    const data = await col.find({}).toArray();
+    const data = await col.find({}).sort({ createdAt: -1 }).toArray();
     res.json(data);
   } catch (err) {
     console.log("GET ERROR:", err);
@@ -56,6 +75,8 @@ app.get("/certificates", async (req, res) => {
   }
 });
 
+// ======================
+// POST
 // ======================
 app.post("/certificates", async (req, res) => {
   try {
@@ -71,13 +92,17 @@ app.post("/certificates", async (req, res) => {
     } = req.body;
 
     if (!name || !iqama || !cardNo || !expiry || !issued || !course) {
-      return res.status(400).json({ message: "Missing fields" });
+      return res.status(400).json({
+        message: "Missing fields",
+      });
     }
 
     const exist = await col.findOne({ cardNo });
 
     if (exist) {
-      return res.status(400).json({ message: "Card already exists" });
+      return res.status(400).json({
+        message: "Card already exists",
+      });
     }
 
     const result = await col.insertOne({
@@ -101,4 +126,11 @@ app.post("/certificates", async (req, res) => {
   }
 });
 
-module.exports = app;
+// ======================
+// SERVER START (LOCAL ONLY)
+// ======================
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
