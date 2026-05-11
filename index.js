@@ -1,7 +1,23 @@
-import { MongoClient } from "mongodb";
+const express = require("express");
+const cors = require("cors");
+const { MongoClient } = require("mongodb");
+
+const app = express();
 
 // =========================
-// MONGODB CLIENT
+// CORS
+// =========================
+app.use(
+  cors({
+    origin:
+      "https://sher-stendararabia-front.vercel.app",
+  })
+);
+
+app.use(express.json());
+
+// =========================
+// MONGODB
 // =========================
 const client = new MongoClient(
   process.env.MONGO_URI
@@ -27,157 +43,126 @@ const formatDate = (date) => {
 };
 
 // =========================
-// API HANDLER
+// CONNECT DATABASE
 // =========================
-export default async function handler(
-  req,
-  res
-) {
+async function startServer() {
 
-  // =========================
-  // CORS
-  // =========================
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://sher-stendararabia-front.vercel.app"
+  await client.connect();
+
+  console.log("MongoDB Connected");
+
+  const db = client.db(
+    "standardarabia"
   );
 
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET,POST,OPTIONS"
-  );
-
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type"
-  );
+  const collection =
+    db.collection("certificates");
 
   // =========================
-  // OPTIONS REQUEST
+  // HOME
   // =========================
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  app.get("/", (req, res) => {
+    res.send("Backend Running");
+  });
 
-  try {
-
-    // =========================
-    // CONNECT DATABASE
-    // =========================
-    await client.connect();
-
-    const db = client.db(
-      "standardarabia"
-    );
-
-    const collection =
-      db.collection("certificates");
-
-    // =========================
-    // GET ALL CERTIFICATES
-    // =========================
-    if (req.method === "GET") {
+  // =========================
+  // GET CERTIFICATES
+  // =========================
+  app.get(
+    "/certificates",
+    async (req, res) => {
 
       const data = await collection
         .find({})
         .sort({ createdAt: -1 })
         .toArray();
 
-      return res.status(200).json({
-        success: true,
-        data,
-      });
+      res.json(data);
     }
+  );
 
-    // =========================
-    // CREATE CERTIFICATE
-    // =========================
-    if (req.method === "POST") {
+  // =========================
+  // POST CERTIFICATE
+  // =========================
+  app.post(
+    "/certificates",
+    async (req, res) => {
 
-      const {
-        name,
-        iqama,
-        cardNo,
-        expiry,
-        issued,
-        course,
-      } = req.body;
+      try {
 
-      // =========================
-      // VALIDATION
-      // =========================
-      if (
-        !name ||
-        !iqama ||
-        !cardNo ||
-        !expiry ||
-        !issued ||
-        !course
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "All fields are required",
-        });
-      }
-
-      // =========================
-      // DUPLICATE CHECK
-      // =========================
-      const exist =
-        await collection.findOne({
-          cardNo,
-        });
-
-      if (exist) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Card number already exists",
-        });
-      }
-
-      // =========================
-      // INSERT DATA
-      // =========================
-      const result =
-        await collection.insertOne({
+        const {
           name,
           iqama,
           cardNo,
-          expiry: formatDate(expiry),
-          issued: formatDate(issued),
+          expiry,
+          issued,
           course,
-          createdAt: new Date(),
+        } = req.body;
+
+        if (
+          !name ||
+          !iqama ||
+          !cardNo ||
+          !expiry ||
+          !issued ||
+          !course
+        ) {
+          return res.status(400).json({
+            message:
+              "All fields required",
+          });
+        }
+
+        // duplicate check
+        const exist =
+          await collection.findOne({
+            cardNo,
+          });
+
+        if (exist) {
+          return res.status(400).json({
+            message:
+              "Card already exists",
+          });
+        }
+
+        // insert
+        const result =
+          await collection.insertOne({
+            name,
+            iqama,
+            cardNo,
+            expiry:
+              formatDate(expiry),
+            issued:
+              formatDate(issued),
+            course,
+            createdAt:
+              new Date(),
+          });
+
+        res.status(201).json({
+          success: true,
+          insertedId:
+            result.insertedId,
         });
 
-      // =========================
-      // SUCCESS RESPONSE
-      // =========================
-      return res.status(201).json({
-        success: true,
-        message:
-          "Certificate saved successfully",
-        insertedId:
-          result.insertedId,
-      });
+      } catch (err) {
+
+        console.log(err);
+
+        res.status(500).json({
+          success: false,
+          message: err.message,
+        });
+      }
     }
-
-    // =========================
-    // METHOD NOT ALLOWED
-    // =========================
-    return res.status(405).json({
-      success: false,
-      message: "Method not allowed",
-    });
-
-  } catch (err) {
-
-    console.log(err);
-
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
-  }
+  );
 }
+
+startServer();
+
+// =========================
+// EXPORT APP
+// =========================
+module.exports = app;
