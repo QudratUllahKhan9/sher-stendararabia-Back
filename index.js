@@ -6,9 +6,6 @@ const { MongoClient } = require("mongodb");
 
 const app = express();
 
-// ======================
-// DEBUG ENV
-// ======================
 console.log("ENV CHECK:", process.env.MONGO_URI);
 
 // ======================
@@ -23,42 +20,45 @@ app.use(
       "https://sher-stendararabia-front.vercel.app",
     ],
     methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type"],
   })
 );
 
-app.options("*", cors());
+// ✅ FIXED (NO "*")
+app.options(/.*/, cors());
 
 // ======================
-// MONGO CLIENT
+// MONGO SETUP (SAFE)
 // ======================
+if (!process.env.MONGO_URI) {
+  console.error("❌ MONGO_URI missing!");
+}
+
 const client = new MongoClient(process.env.MONGO_URI);
 
 let db;
 let collection;
 
-// ======================
-// CONNECT DB (SAFE)
-// ======================
 async function connectDB() {
-  if (!process.env.MONGO_URI) {
-    throw new Error("MONGO_URI is missing");
+  try {
+    if (!db) {
+      await client.connect();
+      db = client.db("standardarabia");
+      collection = db.collection("certificates");
+      console.log("✅ Mongo Connected");
+    }
+    return collection;
+  } catch (err) {
+    console.log("❌ Mongo Error:", err);
+    throw err;
   }
-
-  if (!db) {
-    await client.connect();
-    db = client.db("standardarabia");
-    collection = db.collection("certificates");
-    console.log("Mongo Connected");
-  }
-
-  return collection;
 }
 
 // ======================
 // TEST ROUTE
 // ======================
 app.get("/", (req, res) => {
-  res.send("API Working 🚀");
+  res.send("🚀 API Working");
 });
 
 // ======================
@@ -127,10 +127,10 @@ app.post("/certificates", async (req, res) => {
 });
 
 // ======================
-// SERVER START (LOCAL ONLY)
+// LOCAL SERVER ONLY
 // ======================
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
+  console.log("🚀 Server running on port", PORT);
 });
